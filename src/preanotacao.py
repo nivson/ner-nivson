@@ -35,6 +35,20 @@ TIPOS = [
     "anel suporte", "pop socket", "caneta touch", "estabilizador",
 ]
 
+# Tipos que caracterizam acessorio: neste caso o modelo citado no titulo e o
+# aparelho compativel, nao o produto vendido.
+TIPOS_ACESSORIO = {
+    "capa", "capinha", "case", "bumper", "capa protetora", "capa carteira",
+    "capa flip", "capa com magsafe", "pelicula", "pelicula de vidro",
+    "pelicula de hydrogel", "pelicula protetora", "pelicula 3d",
+    "protetor de tela", "suporte", "suporte veicular", "apoio",
+    "apoio para smartphone", "carregador", "carregador sem fio",
+    "carregador de parede", "carregador veicular", "carregador portatil",
+    "base carregadora", "cabo", "cabo usb-c", "cabo lightning",
+    "cabo micro usb", "adaptador", "pulseira", "anel suporte", "pop socket",
+    "caneta touch", "sleeve", "bolsa", "mochila",
+}
+
 CORES = [
     "preto fosco", "preto espacial", "preto-espacial", "preto",
     "branco", "azul pacifico", "azul-pacifico", "azul marinho", "azul escuro",
@@ -62,6 +76,9 @@ PADROES_MODELO = [
     r"(?<=nokia\s)[a-z]{1,2}\d{2,3}(?:\s(?:plus|pro))?",
     r"(?<=philco\s)hit\s[a-z]?\d{1,3}",
     r"(?<=positivo\s)[a-z]{1,2}\d{3,4}",
+    r"\bms\d{2,3}[a-z]?\b",
+    # variante listada apos barra: "iPhone X / XS"
+    r"(?<=/\s)(?:xs\s+max|xs|xr|\d{1,2}(?:\s+(?:pro\s+max|pro|plus|mini))?)\b",
 ]
 
 # ---------------------------------------------------------------------------
@@ -90,15 +107,22 @@ REGEX_ESTATICAS = [
     ("CODIGO", r"\b[A-Z]{1,3}-?\d{3,5}\b", 3),
     ("CODIGO", r"\b[A-Z0-9]{5,}/[A-Z]\b", 5),
     ("COR", rf"\b(?:{_alternativa(CORES)})\b", 2),
+    ("COR", r"\(product\)\s?red\b", 3),
     ("TIPO", rf"\b(?:{_alternativa(TIPOS)})\b", 1),
     ("MODELO", "|".join(PADROES_MODELO), 4),
 ]
 
 
+# Termos cadastrados como marca no catalogo que na verdade sao generico.
+MARCAS_IGNORADAS = {"kit", "kit cel", "combo", "outros", "generico", "sem marca"}
+
+
 def _regex_marcas(marcas):
-    if not marcas:
+    termos = [normalizar(m) for m in marcas]
+    termos = [t for t in termos if t not in MARCAS_IGNORADAS]
+    if not termos:
         return None
-    return re.compile(rf"\b(?:{_alternativa([normalizar(m) for m in marcas])})\b")
+    return re.compile(rf"\b(?:{_alternativa(termos)})\b")
 
 
 # ---------------------------------------------------------------------------
@@ -163,16 +187,28 @@ def _ajustar_bordas(titulo, inicio, fim):
 
 def anotar_titulo(titulo, marcas_regex=None, marcar_compatibilidade=True):
     """Retorna a lista de entidades [inicio, fim, TAG] para um titulo."""
+    resolvidos = _resolver_sobreposicao(_candidatos(titulo, marcas_regex))
+
+    # Se o produto e um acessorio, o modelo citado no titulo e o aparelho
+    # compativel, e nao o produto vendido (ver guia de anotacao).
+    e_acessorio = False
+    if marcar_compatibilidade:
+        for inicio, fim, tag in resolvidos:
+            if tag == "TIPO" and normalizar(titulo[inicio:fim]) in TIPOS_ACESSORIO:
+                e_acessorio = True
+                break
+
     entidades = []
-    for inicio, fim, tag in _resolver_sobreposicao(_candidatos(titulo, marcas_regex)):
+    for inicio, fim, tag in resolvidos:
         inicio, fim = _ajustar_bordas(titulo, inicio, fim)
         if fim <= inicio:
             continue
-        # Em acessorios, o modelo citado apos "para" e compatibilidade,
-        # nao o produto em si (ver guia de anotacao).
-        if marcar_compatibilidade and tag == "MODELO":
+        if tag == "MODELO" and marcar_compatibilidade:
             anterior = normalizar(titulo[max(0, inicio - 25):inicio])
-            if re.search(r"\b(para|compativel\s+com|compativeis\s+com)\b[\s\w]{0,12}$", anterior):
+            citado_como_alvo = re.search(
+                r"\b(para|compativel\s+com|compativeis\s+com|p/)\b[\s\w]{0,12}$", anterior
+            )
+            if e_acessorio or citado_como_alvo:
                 tag = "COMPATIBILIDADE"
         entidades.append([inicio, fim, tag])
     return entidades
