@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anotador de entidades</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --papel:#e9ebef; --carta:#ffffff; --tinta:#161a21; --tinta-fraca:#5c6573;
+  --linha:#d3d8e0; --realce:#fff3c4; --alerta:#a8321f;
+  --t1:#1d4ed8; --t2:#b91c1c; --t3:#c2410c; --t4:#a16207; --t5:#15803d;
+  --t6:#0f766e; --t7:#7e22ce; --t8:#0369a1; --t9:#4d7c0f; --t10:#be185d;
+  --t11:#57534e; --t12:#7c2d12; --t13:#334155;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --papel:#12151a; --carta:#1b1f26; --tinta:#e8ebef; --tinta-fraca:#98a1b0;
+         --linha:#2c323c; --realce:#3d3413; }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--papel); color:var(--tinta);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.5;
+}
+.envelope{max-width:960px;margin:0 auto;padding:24px 20px 64px}
+
+/* topo */
+.barra{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:8px}
+h1{font-size:17px;font-weight:600;margin:0;letter-spacing:-.01em}
+.posicao{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--tinta-fraca)}
+.trilho{height:3px;background:var(--linha);border-radius:2px;overflow:hidden;margin:12px 0 20px}
+.trilho i{display:block;height:100%;background:var(--t5);width:0;transition:width .2s}
+
+/* carregar */
+.abertura{background:var(--carta);border:1px solid var(--linha);border-radius:6px;padding:28px}
+.abertura p{color:var(--tinta-fraca);max-width:62ch;margin:0 0 18px}
+input[type=file]{font:inherit}
+
+/* palco */
+.palco{background:var(--carta);border:1px solid var(--linha);border-radius:6px;padding:28px 28px 20px;margin-bottom:16px}
+#titulo{
+  font-size:26px;line-height:1.75;letter-spacing:-.01em;
+  cursor:text;user-select:none;-webkit-user-select:none;word-break:break-word;
+}
+#titulo span{padding:2px 0;border-radius:2px}
+#titulo span.sel{background:var(--realce);box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+#titulo span.ent{border-bottom:3px solid var(--cor)}
+#titulo span.ent.fundo{background:color-mix(in srgb,var(--cor) 13%,transparent)}
+#titulo span.foco{outline:2px solid var(--alerta);outline-offset:1px}
+
+/* entidades marcadas */
+.marcadas{display:flex;flex-wrap:wrap;gap:6px;margin-top:22px;padding-top:18px;border-top:1px solid var(--linha);min-height:46px}
+.ficha{
+  display:inline-flex;align-items:center;gap:7px;padding:4px 6px 4px 9px;
+  border:1px solid var(--cor);border-radius:4px;font-size:13px;background:transparent;
+}
+.ficha b{font-weight:500;color:var(--cor);font-size:11px;letter-spacing:.02em}
+.ficha button{
+  border:0;background:transparent;color:var(--tinta-fraca);cursor:pointer;
+  font-size:15px;line-height:1;padding:2px 3px;border-radius:3px;
+}
+.ficha button:hover{background:var(--linha);color:var(--alerta)}
+.vazio{color:var(--tinta-fraca);font-size:13px;align-self:center}
+
+/* tags */
+.paleta{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:18px}
+.tag{
+  display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;
+  background:var(--carta);border:1px solid var(--linha);border-left:4px solid var(--cor);
+  border-radius:4px;font:inherit;font-size:13px;color:var(--tinta);text-align:left;
+}
+.tag:hover{border-color:var(--cor)}
+.tag kbd{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--tinta-fraca);
+  border:1px solid var(--linha);border-radius:3px;padding:1px 5px;margin-left:auto;
+}
+.tag:disabled{opacity:.4;cursor:default}
+
+/* rodape */
+.controles{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button.acao{
+  font:inherit;font-size:13px;padding:8px 14px;border-radius:4px;cursor:pointer;
+  background:var(--carta);color:var(--tinta);border:1px solid var(--linha);
+}
+button.acao:hover{border-color:var(--tinta-fraca)}
+button.acao.forte{background:var(--t5);color:#fff;border-color:var(--t5)}
+.espaco{flex:1}
+.nota{font-size:12.5px;color:var(--tinta-fraca);margin-top:20px;max-width:70ch}
+.nota code{font-family:"IBM Plex Mono",monospace;font-size:12px}
+.aviso{color:var(--alerta)}
+:focus-visible{outline:2px solid var(--t1);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="envelope">
+
+  <div class="barra">
+    <h1>Anotador de entidades</h1>
+    <span class="posicao" id="posicao"></span>
+  </div>
+  <div class="trilho"><i id="trilho"></i></div>
+
+  <section class="abertura" id="abertura">
+    <p>Carregue o arquivo <code>cellphone.ibyte.revisar.jsonl</code>. Se você já
+    revisou parte dele antes neste navegador, o progresso é retomado de onde parou.</p>
+    <input type="file" id="arquivo" accept=".jsonl,.json,.txt">
+  </section>
+
+  <main id="area" hidden>
+    <div class="palco">
+      <div id="titulo"></div>
+      <div class="marcadas" id="marcadas"></div>
+    </div>
+
+    <div class="paleta" id="paleta"></div>
+
+    <div class="controles">
+      <button class="acao" id="anterior">← Anterior</button>
+      <button class="acao forte" id="proximo">Próximo →</button>
+      <button class="acao" id="limpar">Apagar todas deste título</button>
+      <span class="espaco"></span>
+      <button class="acao" id="baixar">Baixar anotações</button>
+    </div>
+
+    <p class="nota">
+      Arraste sobre o título para selecionar e escolha a tag, ou use a tecla ao lado dela.
+      Clique numa entidade já marcada para selecioná-la e apague com <code>Delete</code>.
+      Navegue com <code>Enter</code> e as setas.
+      <span class="aviso">O progresso fica guardado neste navegador. Baixe o arquivo com frequência.</span>
+    </p>
+  </main>
+</div>
+
+<script>
+const TAGS = [
+  ["TIPO","1","--t1"], ["MARCA","2","--t2"], ["MODELO","3","--t3"],
+  ["COMPATIBILIDADE","4","--t4"], ["MEMORIA","5","--t5"], ["RAM","6","--t6"],
+  ["COR","7","--t7"], ["TELA","8","--t8"], ["REDE","9","--t9"],
+  ["CAMERA","0","--t10"], ["BATERIA","q","--t11"], ["POTENCIA","w","--t12"],
+  ["CODIGO","e","--t13"],
+];
+const COR = Object.fromEntries(TAGS.map(([nome,,v]) => [nome, `var(${v})`]));
+const CHAVE = "anotacoes-ner";
+
+let registros = [];
+let atual = 0;
+let selecao = null;      // {ini, fim} pendente
+let focada = null;       // indice da entidade selecionada
+let arrastando = false;
+let ancora = null;
+
+const $ = id => document.getElementById(id);
+
+/* ---------- carregamento ---------- */
+
+$("arquivo").addEventListener("change", ev => {
+  const arq = ev.target.files[0];
+  if (!arq) return;
+  const leitor = new FileReader();
+  leitor.onload = () => {
+    try {
+      const novos = leitor.result.split("\n").filter(l => l.trim()).map(JSON.parse);
+      registros = casarComSalvo(novos);
+      $("abertura").hidden = true;
+      $("area").hidden = false;
+      montarPaleta();
+      desenhar();
+    } catch (erro) {
+      alert("Não consegui ler o arquivo. Esperado um JSONL com um objeto por linha.\n\n" + erro.message);
+    }
+  };
+  leitor.readAsText(arq, "utf-8");
+});
+
+function casarComSalvo(novos){
+  const salvo = ler();
+  if (!salvo) return novos;
+  const porTexto = new Map(salvo.registros.map(r => [r.text, r.entities]));
+  let retomados = 0;
+  for (const r of novos) {
+    if (porTexto.has(r.text)) { r.entities = porTexto.get(r.text); retomados++; }
+  }
+  atual = Math.min(salvo.atual || 0, novos.length - 1);
+  if (retomados) {
+    const seguir = confirm(`Encontrei ${retomados} títulos já revisados neste navegador. Continuar de onde parou?`);
+    if (!seguir) { atual = 0; return novos.map(r => ({...r})); }
+  }
+  return novos;
+}
+
+function ler(){
+  try { const bruto = localStorage.getItem(CHAVE); return bruto ? JSON.parse(bruto) : null; }
+  catch { return null; }
+}
+
+function gravar(){
+  try { localStorage.setItem(CHAVE, JSON.stringify({ atual, registros })); }
+  catch { /* navegador sem armazenamento: o botao de baixar continua valendo */ }
+}
+
+/* ---------- interface ---------- */
+
+function montarPaleta(){
+  $("paleta").innerHTML = "";
+  for (const [nome, tecla, variavel] of TAGS) {
+    const b = document.createElement("button");
+    b.className = "tag";
+    b.style.setProperty("--cor", `var(${variavel})`);
+    b.innerHTML = `<span>${nome}</span><kbd>${tecla}</kbd>`;
+    b.onclick = () => aplicar(nome);
+    $("paleta").appendChild(b);
+  }
+}
+
+function desenhar(){
+  const reg = registros[atual];
+  const texto = reg.text;
+  const alvo = $("titulo");
+  alvo.innerHTML = "";
+
+  const deCada = new Array(texto.length).fill(null);
+  reg.entities.forEach(([ini, fim, tag], indice) => {
+    for (let i = ini; i < fim && i < texto.length; i++) deCada[i] = { tag, indice, ini, fim };
+  });
+
+  for (let i = 0; i < texto.length; i++) {
+    const s = document.createElement("span");
+    s.textContent = texto[i];
+    s.dataset.i = i;
+    const e = deCada[i];
+    if (e) {
+      s.classList.add("ent", "fundo");
+      s.style.setProperty("--cor", COR[e.tag] || "var(--t13)");
+      if (focada === e.indice) s.classList.add("foco");
+    }
+    if (selecao && i >= selecao.ini && i < selecao.fim) s.classList.add("sel");
+    alvo.appendChild(s);
+  }
+
+  desenharFichas(reg, texto);
+  $("posicao").textContent = `${atual + 1} de ${registros.length}`;
+  $("trilho").style.width = ((atual + 1) / registros.length * 100) + "%";
+  gravar();
+}
+
+function desenharFichas(reg, texto){
+  const caixa = $("marcadas");
+  caixa.innerHTML = "";
+  if (!reg.entities.length) {
+    caixa.innerHTML = '<span class="vazio">Nenhuma entidade marcada neste título.</span>';
+    return;
+  }
+  reg.entities
+    .map((e, indice) => ({ e, indice }))
+    .sort((a, b) => a.e[0] - b.e[0])
+    .forEach(({ e, indice }) => {
+      const [ini, fim, tag] = e;
+      const f = document.createElement("span");
+      f.className = "ficha";
+      f.style.setProperty("--cor", COR[tag] || "var(--t13)");
+      f.innerHTML = `<b>${tag}</b><span>${escapar(texto.slice(ini, fim))}</span>`;
+      const x = document.createElement("button");
+      x.textContent = "×";
+      x.title = "Remover";
+      x.onclick = () => { reg.entities.splice(indice, 1); focada = null; desenhar(); };
+      f.appendChild(x);
+      caixa.appendChild(f);
+    });
+}
+
+const escapar = t => t.replace(/[&<>]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;" }[c]));
+
+/* ---------- selecao por arrasto ---------- */
+
+const alvo = $("titulo");
+
+alvo.addEventListener("mousedown", ev => {
+  const i = indiceDe(ev.target);
+  if (i === null) return;
+  arrastando = true; ancora = i; focada = null;
+  selecao = { ini: i, fim: i + 1 };
+  desenhar();
+  ev.preventDefault();
+});
+
+alvo.addEventListener("mousemove", ev => {
+  if (!arrastando) return;
+  const i = indiceDe(ev.target);
+  if (i === null) return;
+  selecao = { ini: Math.min(ancora, i), fim: Math.max(ancora, i) + 1 };
+  desenhar();
+});
+
+document.addEventListener("mouseup", ev => {
+  if (!arrastando) return;
+  arrastando = false;
+  const reg = registros[atual];
+  // clique simples dentro de uma entidade: seleciona para remocao
+  if (selecao && selecao.fim - selecao.ini === 1) {
+    const achou = reg.entities.findIndex(([i, f]) => selecao.ini >= i && selecao.ini < f);
+    if (achou >= 0) { focada = achou; selecao = null; desenhar(); return; }
+  }
+  selecao = alargarAtePalavra(reg.text, selecao);
+  desenhar();
+});
+
+function indiceDe(no){
+  if (!no || !no.dataset || no.dataset.i === undefined) return null;
+  return parseInt(no.dataset.i, 10);
+}
+
+function alargarAtePalavra(texto, sel){
+  if (!sel) return null;
+  const parte = /[\wÀ-ÿ]/;
+  let { ini, fim } = sel;
+  while (ini > 0 && parte.test(texto[ini - 1]) && parte.test(texto[ini])) ini--;
+  while (fim < texto.length && parte.test(texto[fim]) && parte.test(texto[fim - 1])) fim++;
+  while (ini < fim && !/\S/.test(texto[ini])) ini++;
+  while (fim > ini && !/\S/.test(texto[fim - 1])) fim--;
+  return fim > ini ? { ini, fim } : null;
+}
+
+/* ---------- edicao ---------- */
+
+function aplicar(tag){
+  if (!selecao) return;
+  const reg = registros[atual];
+  // remove o que estiver sobreposto, para nao gerar spans conflitantes
+  reg.entities = reg.entities.filter(([i, f]) => f <= selecao.ini || i >= selecao.fim);
+  reg.entities.push([selecao.ini, selecao.fim, tag]);
+  reg.entities.sort((a, b) => a[0] - b[0]);
+  selecao = null;
+  desenhar();
+}
+
+function andar(passo){
+  const destino = atual + passo;
+  if (destino < 0 || destino >= registros.length) return;
+  atual = destino; selecao = null; focada = null;
+  desenhar();
+  window.scrollTo({ top: 0 });
+}
+
+$("proximo").onclick = () => andar(1);
+$("anterior").onclick = () => andar(-1);
+$("limpar").onclick = () => {
+  registros[atual].entities = [];
+  focada = null; selecao = null;
+  desenhar();
+};
+$("baixar").onclick = () => {
+  const linhas = registros.map(r => JSON.stringify({ text: r.text, entities: r.entities })).join("\n") + "\n";
+  const url = URL.createObjectURL(new Blob([linhas], { type: "application/json" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "cellphone.ibyte.jsonl";
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+document.addEventListener("keydown", ev => {
+  if ($("area").hidden) return;
+  if (ev.target.tagName === "INPUT") return;
+
+  const porTecla = TAGS.find(([, tecla]) => tecla === ev.key.toLowerCase());
+  if (porTecla && selecao) { aplicar(porTecla[0]); ev.preventDefault(); return; }
+
+  if (ev.key === "Enter" || ev.key === "ArrowRight") { andar(1); ev.preventDefault(); }
+  else if (ev.key === "ArrowLeft") { andar(-1); ev.preventDefault(); }
+  else if (ev.key === "Delete" || ev.key === "Backspace") {
+    if (focada !== null) {
+      registros[atual].entities.splice(focada, 1);
+      focada = null; desenhar(); ev.preventDefault();
+    }
+  } else if (ev.key === "Escape") { selecao = null; focada = null; desenhar(); }
+});
+
+window.addEventListener("beforeunload", gravar);
+</script>
+</body>
+</html>
