@@ -86,5 +86,8 @@ sem tag nesta versão do esquema.
 
 | Data | Decisão | Motivo |
 |---|---|---|
-| | Criada a tag `COMPATIBILIDADE` | metade da base é acessório e marcar o aparelho alvo como `MODELO` confundiria o cadastro |
-| | `RAM` separada de `MEMORIA` | são campos distintos no cadastro do produto |
+| 18/09 | Criada a tag `COMPATIBILIDADE` | metade da base é acessório e marcar o aparelho alvo como `MODELO` confundiria o cadastro |
+| 18/09 | `RAM` separada de `MEMORIA` | são campos distintos no cadastro do produto |
+| 18/09 | Acessório define compatibilidade pelo tipo do produto, não pela palavra "para" | títulos como `Capa iPhone 11 Pro Max` não têm a preposição |
+| 18/09 | `Kit` e `Combo` removidos do dicionário de marcas | cadastrados como marca no catálogo da loja, mas são termos genéricos |
+| 18/09 | Em kits com dois produtos, anotar apenas o principal | o cadastro do e-commerce é de um produto só |
