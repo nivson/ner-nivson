@@ -6,7 +6,7 @@ vendedor digita o título.
 
 ## Autor
 
-Nivson - SEU EMAIL
+Nivson Jesus - nsj@cesar.school
 
 ## Base escolhida
 
@@ -32,14 +32,14 @@ acessório se destina), já que aproximadamente metade da base é de acessórios
 1. **Pré-anotação por regras** (`src/preanotacao.py`): dicionário de marcas
    extraído do próprio campo `brand` do microdata, mais expressões regulares
    para os atributos numéricos e um gazetteer de cores e tipos.
-2. **Revisão manual no Doccano** sobre o rascunho gerado, em vez de anotação do
-   zero.
-3. **Amostragem estratificada** por categoria: 400 títulos revisados
-   manualmente, preservando a proporção entre produto principal e acessórios.
-   O tamanho da amostra é justificado pela curva de aprendizado no notebook de
-   avaliação.
-4. O restante da base fica como conjunto não anotado, usado para inspeção
-   qualitativa das predições.
+2. **Revisão manual** sobre o rascunho gerado, em vez de anotação do zero, na
+   ferramenta em `tools/anotador.html`.
+3. **Amostragem estratificada** por categoria para o conjunto de teste: 49
+   títulos revisados manualmente, preservando a proporção entre produto
+   principal e acessórios.
+4. Os 983 títulos restantes formam o conjunto de treino, com rótulo automático.
+   A separação permite medir o efeito da qualidade da anotação sobre o
+   resultado.
 
 O mesmo componente de regras é reaproveitado como **baseline** na comparação
 experimental.
@@ -48,12 +48,29 @@ experimental.
 
 ```
 data/raw/              bases brutas (microdata da ibyte)
-data/annotations/      anotações no formato JSONL do Doccano
+data/annotations/      anotações no formato JSONL
 docs/guia-anotacao.md  definição das tags e regras de decisão
+docs/resultados.md     relatório dos experimentos
 notebooks/             exploração, anotação, treinamento e avaliação
 src/                   código compartilhado entre os notebooks
+tools/anotador.html    ferramenta de revisão das anotações
 scripts/               subida do Doccano em container
 ```
+
+## Resultados
+
+Avaliação em nível de span estrito, contra 49 títulos revisados manualmente.
+
+| Sistema | Títulos de treino | Micro F1 |
+|---|---|---|
+| Regras | 0 | 0,946 |
+| CRF com rótulo automático | 983 | 0,938 |
+| CRF com rótulo humano | 39 | 0,818 |
+
+O CRF treinado com rótulo automático reproduz as regras que o rotularam, com F1
+idêntico em oito das doze entidades, e a curva de aprendizado satura (0,002 de
+ganho entre 600 e 983 títulos). Análise completa em
+[`docs/resultados.md`](docs/resultados.md).
 
 ## Notebooks
 
@@ -61,6 +78,9 @@ scripts/               subida do Doccano em container
 |---|---|
 | `01_exploracao_dados.ipynb` | leitura do microdata, deduplicação, estatísticas, vocabulário |
 | `02_preanotacao_regras.ipynb` | regras, geração do rascunho e amostragem para revisão |
+| `03_amostra_teste.ipynb` | separação treino/teste e medição do erro das regras |
+| `04_regras_e_crf.ipynb` | baseline, CRF e curva de aprendizado |
+| `05_rotulo_humano.ipynb` | validação cruzada com rótulo humano |
 
 ## Execução
 
@@ -69,7 +89,14 @@ pip install -r requirements.txt
 jupyter notebook notebooks/
 ```
 
-## Doccano
+## Anotação
+
+A revisão foi feita em `tools/anotador.html`, ferramenta construída para este
+trabalho por indisponibilidade de Docker no ambiente. Ela roda no navegador sem
+instalação, lê o JSONL pré-anotado e exporta no mesmo formato do Doccano, de
+modo que as anotações permanecem compatíveis.
+
+Para usar o Doccano em vez dela, os scripts originais continuam no repositório:
 
 ```bash
 chmod +x scripts/*.sh
